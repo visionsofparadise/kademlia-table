@@ -89,14 +89,14 @@ it("sends node to tail of bucket on seen", () => {
 
 	const node = { id: randomBytes(8).toString("hex") };
 
+	customTable.add(node);
+
 	for (let i = 0; i < 10; i++) {
 		customTable.add({ id: randomBytes(8).toString("hex") });
 	}
 
-	customTable.add(node);
-
 	const result = customTable.seen(node.id);
 
 	expect(result).toBe(true);
-	expect(customTable.nodes.at(-1)).toStrictEqual(node);
+	expect(customTable.nodes[10]).toStrictEqual(node);
 });
