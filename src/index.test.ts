@@ -85,23 +85,17 @@ it("gets 20 closest nodes out of 40", () => {
 });
 
 it("sends node to tail of bucket on seen", () => {
-	const customTable = new KademliaTable(randomBytes(8).toString("hex"), { encoding: "hex" });
+	const customTable = new KademliaTable("00000000", { encoding: "hex" });
 
-	const node = { id: randomBytes(8).toString("hex") };
+	const node = { id: `ffffffff` };
 
 	customTable.add(node);
 
-	console.log(customTable.nodes);
-
 	for (let i = 0; i < 10; i++) {
-		customTable.add({ id: randomBytes(8).toString("hex") });
+		customTable.add({ id: `fffffff${i.toString(10)}` });
 	}
 
-	console.log(customTable.nodes);
-
 	const result = customTable.seen(node.id);
-
-	console.log(customTable.nodes);
 
 	expect(result).toBe(true);
 	expect(customTable.nodes[10]).toStrictEqual(node);
