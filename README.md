@@ -21,18 +21,13 @@ interface Node {
 
 // Create a new table that stores nodes "close" to the passed in id.
 // The id should be uniformily distributed, ie a hash, random bytes etc.
-const table = new KademliaTable() < Node > randomBytes(32).toString();
-
-const randomId = randomBytes(32).toString();
+const table = new KademliaTable<Node>(id());
 
 // Add a node to the routing table
-table.add({
-	id: randomId,
-	// ...properties of Node
-});
+table.add({ id: id() });
 
 // Get the 20 nodes "closest" to a passed in id
-const closest = table.closest(randomId, 20);
+const closest = table.closest(id(), 20);
 ```
 
 ## Extending The Table
@@ -59,22 +54,6 @@ class CustomTable extends KademliaTable<Node> {
 		return true;
 	}
 }
-
-// Create a new table that stores nodes "close" to the passed in id.
-// The id should be uniformily distributed, ie a hash, random bytes etc.
-// Node represents the node type. Typically id, ipc4, port, etc.
-const table = new KademliaTable() < Node > randomBytes(32).toString();
-
-const randomId = randomBytes(32).toString();
-
-// Add a node to the routing table
-table.add({
-	id: randomId,
-	/// ...properties of Node
-});
-
-// Get the 20 nodes "closest" to a passed in id
-const closest = table.closest(randomId, 20);
 ```
 
 ## API
@@ -83,7 +62,7 @@ const closest = table.closest(randomId, 20);
 
 Create a new routing table.
 
-`id` should be a Buffer that is uniformily distributed. `configuration` include:
+`id` should be a string that is uniformily distributed. `configuration` includes:
 
 ```js
 {

@@ -76,6 +76,23 @@ export class KademliaTable<N extends Node = Node> {
 		return this.getNodes(i, a);
 	}
 
+	update(id: string, body: Partial<Omit<N, 'id'>>) {
+		const i = this.getI(id)
+
+		if (!this.has(id, i)) return false
+
+		const index = this.buckets[i].findIndex((node) => node.id === id)
+
+		const updatedNode = {
+			...this.buckets[i][index],
+			...body
+		}
+
+		this.buckets[i][index] = updatedNode
+
+		return updatedNode
+	}
+
 	seen(id: string) {
 		const i = this.getI(id);
 
