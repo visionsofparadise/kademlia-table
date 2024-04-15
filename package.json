@@ -2,8 +2,8 @@
   "name": "kademlia-table",
   "version": "1.0.3",
   "description": "XOR based routing table used for P2P networks such as a Kademlia DHT.",
-  "main": "./dist/index.cjs",
-  "module": "./dist/index.js",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
   "files": [
     "dist/**"

@@ -40,9 +40,7 @@ it("returns true when table has node", () => {
 });
 
 it("returns false when table does not have node", () => {
-	const node = { id: randomId() };
-
-	const result = table.has(node.id);
+	const result = table.has(randomId());
 
 	expect(result).toBe(false);
 });
