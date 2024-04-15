@@ -66,8 +66,7 @@ Create a new routing table.
 
 ```js
 {
-  k?: 20 // Max number of nodes in a bucket
-  a?: 3 // Default number of closest nodes returned, represents concurrency
+  bucketSize?: 20 // Max number of nodes in a bucket
   encoding?: "utf8" // Encoding of id strings
 }
 ```
@@ -89,9 +88,9 @@ Returns `true` if a node exists for the passed in `id` and `false` otherwise.
 
 Returns a node or `undefined` if not found.
 
-#### `i = table.getI(id)`
+#### `i = table.getBucketIndex(id)`
 
-Returns a node's `i` value which represents distance from the tables `id` and index for it's corresponding bucket.
+Returns a node's corresponding bucket index.
 
 #### `nodes = table.closest(id, [maxNodes])`
 

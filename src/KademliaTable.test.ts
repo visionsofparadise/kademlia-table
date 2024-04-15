@@ -3,8 +3,10 @@ import { KademliaTable } from ".";
 
 const table = new KademliaTable(randomBytes(8).toString("hex"), { encoding: "hex" });
 
+const randomId = () => randomBytes(8).toString("hex");
+
 it("returns true when node added", () => {
-	const node = { id: randomBytes(8).toString("hex") };
+	const node = { id: randomId() };
 
 	const result = table.add(node);
 
@@ -13,7 +15,7 @@ it("returns true when node added", () => {
 });
 
 it("returns false when node added but bucket full", () => {
-	const customTable = new KademliaTable("00000000", { encoding: "hex", k: 10 });
+	const customTable = new KademliaTable("00000000", { encoding: "hex", bucketSize: 10 });
 
 	const node = { id: `ffffffff` };
 
@@ -28,7 +30,7 @@ it("returns false when node added but bucket full", () => {
 });
 
 it("returns true when table has node", () => {
-	const node = { id: randomBytes(8).toString("hex") };
+	const node = { id: randomId() };
 
 	table.add(node);
 
@@ -38,7 +40,7 @@ it("returns true when table has node", () => {
 });
 
 it("returns false when table does not have node", () => {
-	const node = { id: randomBytes(8).toString("hex") };
+	const node = { id: randomId() };
 
 	const result = table.has(node.id);
 
@@ -46,7 +48,7 @@ it("returns false when table does not have node", () => {
 });
 
 it("gets a node", () => {
-	const node = { id: randomBytes(8).toString("hex") };
+	const node = { id: randomId() };
 
 	table.add(node);
 
@@ -62,26 +64,26 @@ it("gets correct i for id", () => {
 
 	customTable.add(node);
 
-	const i = customTable.getI(node.id);
+	const i = customTable.getBucketIndex(node.id);
 
 	expect(i).toBe(7);
 });
 
-it("gets 20 closest nodes out of 40", () => {
-	const customTable = new KademliaTable(randomBytes(8).toString("hex"), { encoding: "hex" });
+it("gets 20 closest nodes out of 1000", () => {
+	const customTable = new KademliaTable(randomId(), { encoding: "hex" });
 
-	const node = { id: randomBytes(8).toString("hex") };
+	const node = { id: randomId() };
 
 	customTable.add(node);
 
 	for (let i = 0; i < 1000; i++) {
-		customTable.add({ id: randomBytes(8).toString("hex") });
+		customTable.add({ id: randomId() });
 	}
 
-	const closestNodeIds = customTable.closest(node.id);
+	const closestNodeIds = customTable.closest(node.id, 20);
 
 	expect(closestNodeIds[0]).toStrictEqual(node);
-	expect(closestNodeIds.length).toBe(3);
+	expect(closestNodeIds.length).toBe(20);
 });
 
 it("sends node to tail of bucket on seen", () => {
