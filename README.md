@@ -111,6 +111,14 @@ Returns all nodes from table as an array. Ordered from closest to furthest bucke
 
 A fixed size array of all buckets in the table.
 
+#### `number = KademliaTable.getDistance(idA, idB, encoding)`
+
+Gets the XOR distance between two id strings.
+
+#### `1 | -1 | 0 = compare(idA, idB) = KademliaTable.createCompare(targetId, encoding)`
+
+Creates a function for sorting ids based on distance from a target id going from closest to furthest
+
 ## License
 
 MIT

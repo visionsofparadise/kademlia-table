@@ -12,7 +12,30 @@ export namespace KademliaTable {
 }
 
 export class KademliaTable<N extends KademliaTable.Node = KademliaTable.Node> {
-	protected readonly idBytes: Buffer;
+	static getDistance(a: string, b: string, encoding?: Encoding) {
+		const maxLength = Math.max(a.length, b.length);
+
+		const aBytes = Buffer.from(a.padEnd(maxLength, "0"), encoding);
+		const bBytes = Buffer.from(b.padEnd(maxLength, "0"), encoding);
+
+		for (let i = 0; i < aBytes.length; i++) {
+			const a = aBytes[i];
+			const b = bBytes[i];
+
+			if (a !== b) return 8 * aBytes.length - (i * 8 + Math.clz32(a ^ b) - 24);
+		}
+
+		return 0;
+	}
+
+	static createCompare(id: string, encoding: Encoding) {
+		return (a: string, b: string) => {
+			const ad = KademliaTable.getDistance(id, a, encoding);
+			const bd = KademliaTable.getDistance(id, b, encoding);
+
+			return ad > bd ? 1 : ad < bd ? -1 : 0;
+		};
+	}
 
 	readonly bucketSize: number;
 	readonly bucketCount: number;
@@ -23,10 +46,8 @@ export class KademliaTable<N extends KademliaTable.Node = KademliaTable.Node> {
 	constructor(readonly id: string, configuration: KademliaTable.Configuration = {}) {
 		this.encoding = configuration.encoding || "utf8";
 
-		this.idBytes = Buffer.from(id, this.encoding);
-
 		this.bucketSize = configuration.bucketSize || 20;
-		this.bucketCount = this.idBytes.length * 8;
+		this.bucketCount = Buffer.from(id, this.encoding).length * 8 + 1;
 		this.buckets = Array.apply(null, Array(this.bucketCount)).map(() => []);
 	}
 
@@ -57,16 +78,7 @@ export class KademliaTable<N extends KademliaTable.Node = KademliaTable.Node> {
 	}
 
 	getBucketIndex(id: string) {
-		const idBytes = Buffer.from(id.padEnd(this.bucketCount, "0"), this.encoding);
-
-		for (let i = 0; i < this.bucketCount - 1; i++) {
-			const a = this.idBytes[i];
-			const b = idBytes[i];
-
-			if (a !== b) return this.bucketCount - 1 - (i * 8 + Math.clz32(a ^ b) - 24);
-		}
-
-		return 0;
+		return KademliaTable.getDistance(this.id, id, this.encoding);
 	}
 
 	closest(id: string, limit: number = 3) {
@@ -111,19 +123,15 @@ export class KademliaTable<N extends KademliaTable.Node = KademliaTable.Node> {
 	}
 
 	protected getNodes(i0: number, limit: number, depth: number = 0): Array<N> {
-		const maxOffset = Math.max(i0, this.bucketCount - 1 - i0);
+		const offset = (depth % 2 === 0 ? 1 : -1) * Math.ceil(depth / 2);
 
-		const offset = Math.ceil(depth / 2);
+		if (Math.abs(offset) > Math.max(i0, this.bucketCount - 1 - i0)) return [];
 
-		if (offset > maxOffset) return [];
-
-		const i = i0 + (depth % 2 === 0 ? offset : 0 - offset);
+		const i = i0 + offset;
 
 		if (0 > i || i > this.bucketCount - 1) return this.getNodes(i0, limit, depth + 1);
 
-		const bucket = this.buckets[i];
-
-		const nodes = bucket.slice(0, limit);
+		const nodes = this.buckets[i].slice(0, limit);
 
 		if (nodes.length >= limit) return nodes;
 
