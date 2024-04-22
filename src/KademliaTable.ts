@@ -1,37 +1,29 @@
-import type { Encoding } from "node:crypto";
-
 export namespace KademliaTable {
 	export interface Node {
-		id: string;
+		id: Buffer;
 	}
 
 	export interface Configuration {
 		bucketSize?: number;
-		encoding?: Encoding;
 	}
 }
 
 export class KademliaTable<N extends KademliaTable.Node = KademliaTable.Node> {
-	static getDistance(a: string, b: string, encoding?: Encoding) {
-		const maxLength = Math.max(a.length, b.length);
+	static getDistance(a: Buffer, b: Buffer) {
+		for (let i = 0; i < a.length; i++) {
+			const ai = a[i];
+			const bi = b[i];
 
-		const aBytes = Buffer.from(a.padEnd(maxLength, "0"), encoding);
-		const bBytes = Buffer.from(b.padEnd(maxLength, "0"), encoding);
-
-		for (let i = 0; i < aBytes.length; i++) {
-			const a = aBytes[i];
-			const b = bBytes[i];
-
-			if (a !== b) return 8 * aBytes.length - (i * 8 + Math.clz32(a ^ b) - 24);
+			if (ai !== bi) return 8 * a.length - (i * 8 + Math.clz32(ai ^ bi) - 24);
 		}
 
 		return 0;
 	}
 
-	static createCompare(id: string, encoding: Encoding) {
-		return (a: string, b: string) => {
-			const ad = KademliaTable.getDistance(id, a, encoding);
-			const bd = KademliaTable.getDistance(id, b, encoding);
+	static createCompare(id: Buffer) {
+		return (a: Buffer, b: Buffer) => {
+			const ad = KademliaTable.getDistance(id, a);
+			const bd = KademliaTable.getDistance(id, b);
 
 			return ad > bd ? 1 : ad < bd ? -1 : 0;
 		};
@@ -41,13 +33,9 @@ export class KademliaTable<N extends KademliaTable.Node = KademliaTable.Node> {
 	readonly bucketCount: number;
 	readonly buckets: Array<Array<N>>;
 
-	readonly encoding: Encoding;
-
-	constructor(readonly id: string, configuration: KademliaTable.Configuration = {}) {
-		this.encoding = configuration.encoding || "utf8";
-
+	constructor(readonly id: Buffer, configuration: KademliaTable.Configuration = {}) {
 		this.bucketSize = configuration.bucketSize || 20;
-		this.bucketCount = Buffer.from(id, this.encoding).length * 8 + 1;
+		this.bucketCount = id.length * 8 + 1;
 		this.buckets = Array.apply(null, Array(this.bucketCount)).map(() => []);
 	}
 
@@ -69,25 +57,25 @@ export class KademliaTable<N extends KademliaTable.Node = KademliaTable.Node> {
 		return true;
 	}
 
-	has(id: string, i: number = this.getBucketIndex(id)) {
+	has(id: Buffer, i: number = this.getBucketIndex(id)) {
 		return this.buckets[i].some((node) => node.id === id);
 	}
 
-	get(id: string, i: number = this.getBucketIndex(id)) {
+	get(id: Buffer, i: number = this.getBucketIndex(id)) {
 		return this.buckets[i].find((node) => node.id === id);
 	}
 
-	getBucketIndex(id: string) {
-		return KademliaTable.getDistance(this.id, id, this.encoding);
+	getBucketIndex(id: Buffer) {
+		return KademliaTable.getDistance(this.id, id);
 	}
 
-	closest(id: string, limit: number = 3) {
+	closest(id: Buffer, limit: number = 3) {
 		const i = this.getBucketIndex(id);
 
 		return this.getNodes(i, limit);
 	}
 
-	update(id: string, body: Partial<Omit<N, "id">>) {
+	update(id: Buffer, body: Partial<Omit<N, "id">>) {
 		const i = this.getBucketIndex(id);
 
 		if (!this.has(id, i)) return false;
@@ -104,7 +92,7 @@ export class KademliaTable<N extends KademliaTable.Node = KademliaTable.Node> {
 		return updatedNode;
 	}
 
-	seen(id: string) {
+	seen(id: Buffer) {
 		const i = this.getBucketIndex(id);
 
 		const node = this.get(id, i);
@@ -116,7 +104,7 @@ export class KademliaTable<N extends KademliaTable.Node = KademliaTable.Node> {
 		return true;
 	}
 
-	remove(id: string, i: number = this.getBucketIndex(id)) {
+	remove(id: Buffer, i: number = this.getBucketIndex(id)) {
 		this.buckets[i] = this.buckets[i].filter((node) => node.id !== id);
 
 		return true;
