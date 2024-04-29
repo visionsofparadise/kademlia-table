@@ -69,7 +69,7 @@ export class KademliaTable<N extends KademliaTable.Node = KademliaTable.Node> {
 		return KademliaTable.getDistance(this.id, id);
 	}
 
-	closest(id: Buffer, limit: number = 3) {
+	closest(id: Buffer, limit: number = this.bucketSize) {
 		const i = this.getBucketIndex(id);
 
 		return this.getNodes(i, limit);
