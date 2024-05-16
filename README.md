@@ -21,7 +21,7 @@ interface Node {
 
 // Create a new table that stores nodes "close" to the passed in id.
 // The id should be uniformily distributed, ie a hash, random bytes etc.
-const table = new KademliaTable<Node>(id());
+const table = new KademliaTable<'id', Node>(id(), { idKey: 'id' });
 
 // Add a node to the routing table
 table.add({ id: id() });
@@ -42,7 +42,7 @@ interface Node {
 	// ...properties of Node
 }
 
-class CustomTable extends KademliaTable<Node> {
+class CustomTable extends KademliaTable<'id', Node> {
 	add(node: Node): boolean {
 		const result = super.add(node);
 
@@ -66,15 +66,16 @@ Create a new routing table.
 
 ```js
 {
-  bucketSize?: 20 // Max number of nodes in a bucket
+  idKey: 'id' // Key used as id
   encoding?: "utf8" // Encoding of id strings
+  bucketSize?: 20 // Max number of nodes in a bucket
 }
 ```
 
 #### `bool = table.add(node)`
 
-Insert a new node. `node.id` must be a string of same or shorter length as `table.id`.
-When inserting a node the XOR distance between the node and the table.id is
+Insert a new node. `node[idKey]` must be a string of same or shorter length as `table[idKey]`.
+When inserting a node the XOR distance between the node and the table[idKey] is
 calculated and used to figure which bucket this node should be inserted into.
 
 Returns `true` if the node could be added or already exists.

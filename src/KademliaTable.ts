@@ -1,39 +1,48 @@
 export namespace KademliaTable {
-	export interface Node {
-		id: Buffer;
-	}
-
-	export interface Configuration {
+	export interface Configuration<K extends string> {
+		idKey: K;
+		encoding?: BufferEncoding;
 		bucketSize?: number;
 	}
 }
 
-export class KademliaTable<N extends KademliaTable.Node = KademliaTable.Node> {
-	static getDistance(a: Buffer, b: Buffer) {
-		for (let i = 0; i < a.length; i++) {
-			const ai = a[i];
-			const bi = b[i];
+export class KademliaTable<K extends string, N extends { [x in K]: string }> {
+	static getDistance(a: string, b: string, encoding: BufferEncoding) {
+		const bufferA = Buffer.from(a, encoding);
+		const bufferB = Buffer.from(b, encoding);
 
-			if (ai !== bi) return 8 * a.length - (i * 8 + Math.clz32(ai ^ bi) - 24);
+		const length = Math.min(bufferA.length, bufferB.length);
+
+		for (let i = 0; i < a.length; i++) {
+			const ai = bufferA[i];
+			const bi = bufferB[i];
+
+			if (ai !== bi) return 8 * length - (i * 8 + Math.clz32(ai ^ bi) - 24);
 		}
 
 		return 0;
 	}
 
-	static createCompare(id: Buffer) {
-		return (a: Buffer, b: Buffer) => {
-			const ad = KademliaTable.getDistance(id, a);
-			const bd = KademliaTable.getDistance(id, b);
+	static createCompare(id: string, encoding: BufferEncoding) {
+		return (a: string, b: string) => {
+			const ad = KademliaTable.getDistance(id, a, encoding);
+			const bd = KademliaTable.getDistance(id, b, encoding);
 
 			return ad > bd ? 1 : ad < bd ? -1 : 0;
 		};
 	}
 
+	readonly idKey: K;
+	readonly encoding: BufferEncoding;
+
 	readonly bucketSize: number;
 	readonly bucketCount: number;
 	readonly buckets: Array<Array<N>>;
 
-	constructor(readonly id: Buffer, configuration: KademliaTable.Configuration = {}) {
+	constructor(readonly id: string, configuration: KademliaTable.Configuration<K>) {
+		this.idKey = configuration.idKey;
+		this.encoding = configuration.encoding || "utf8";
+
 		this.bucketSize = configuration.bucketSize || 20;
 		this.bucketCount = id.length * 8 + 1;
 		this.buckets = Array.apply(null, Array(this.bucketCount)).map(() => []);
@@ -44,43 +53,43 @@ export class KademliaTable<N extends KademliaTable.Node = KademliaTable.Node> {
 	}
 
 	add(node: N) {
-		const i = this.getBucketIndex(node.id);
+		const i = this.getBucketIndex(node[this.idKey]);
 
 		const bucket = this.buckets[i];
 
 		if (bucket.length >= this.bucketSize) return false;
 
-		if (this.has(node.id, i)) return true;
+		if (this.has(node[this.idKey], i)) return true;
 
 		this.buckets[i] = bucket.concat(node);
 
 		return true;
 	}
 
-	has(id: Buffer, i: number = this.getBucketIndex(id)) {
-		return this.buckets[i].some((node) => node.id === id);
+	has(id: string, i: number = this.getBucketIndex(id)) {
+		return this.buckets[i].some((node) => node[this.idKey] === id);
 	}
 
-	get(id: Buffer, i: number = this.getBucketIndex(id)) {
-		return this.buckets[i].find((node) => node.id === id);
+	get(id: string, i: number = this.getBucketIndex(id)) {
+		return this.buckets[i].find((node) => node[this.idKey] === id);
 	}
 
-	getBucketIndex(id: Buffer) {
-		return KademliaTable.getDistance(this.id, id);
+	getBucketIndex(id: string) {
+		return KademliaTable.getDistance(this.id, id, this.encoding);
 	}
 
-	closest(id: Buffer, limit: number = this.bucketSize) {
+	closest(id: string, limit: number = this.bucketSize) {
 		const i = this.getBucketIndex(id);
 
 		return this.getNodes(i, limit);
 	}
 
-	update(id: Buffer, body: Partial<Omit<N, "id">>) {
+	update(id: string, body: Partial<Omit<N, "id">>) {
 		const i = this.getBucketIndex(id);
 
 		if (!this.has(id, i)) return false;
 
-		const index = this.buckets[i].findIndex((node) => node.id === id);
+		const index = this.buckets[i].findIndex((node) => node[this.idKey] === id);
 
 		const updatedNode = {
 			...this.buckets[i][index],
@@ -92,20 +101,20 @@ export class KademliaTable<N extends KademliaTable.Node = KademliaTable.Node> {
 		return updatedNode;
 	}
 
-	seen(id: Buffer) {
+	seen(id: string) {
 		const i = this.getBucketIndex(id);
 
 		const node = this.get(id, i);
 
 		if (!node) return false;
 
-		this.buckets[i] = this.buckets[i].filter((node) => node.id !== id).concat([node]);
+		this.buckets[i] = this.buckets[i].filter((node) => node[this.idKey] !== id).concat([node]);
 
 		return true;
 	}
 
-	remove(id: Buffer, i: number = this.getBucketIndex(id)) {
-		this.buckets[i] = this.buckets[i].filter((node) => node.id !== id);
+	remove(id: string, i: number = this.getBucketIndex(id)) {
+		this.buckets[i] = this.buckets[i].filter((node) => node[this.idKey] !== id);
 
 		return true;
 	}
