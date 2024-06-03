@@ -12,10 +12,9 @@ An extendable implementation of Kademlia and K-Buckets closely following details
 
 ```js
 import { KademliaTable } from "kademlia-table";
-import { randomBytes } from "node:crypto";
 
 interface Node {
-	id: string;
+	id: Buffer;
 	// ...properties of Node
 }
 
@@ -38,7 +37,7 @@ The base class is extendable to add custom logic to operations. For example you 
 import { KademliaTable } from "kademlia-table";
 
 interface Node {
-	id: string;
+	id: Buffer;
 	// ...properties of Node
 }
 
@@ -62,12 +61,11 @@ class CustomTable extends KademliaTable<'id', Node> {
 
 Create a new routing table.
 
-`id` should be a string that is uniformily distributed. `configuration` includes:
+`id` should be a Buffer that is uniformily distributed. `configuration` includes:
 
 ```js
 {
   idKey: 'id' // Key used as id
-  encoding?: "utf8" // Encoding of id strings
   bucketSize?: 20 // Max number of nodes in a bucket
 }
 ```

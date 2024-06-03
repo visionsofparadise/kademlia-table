@@ -1,26 +1,26 @@
 import { randomBytes } from "node:crypto";
 import { KademliaTable } from ".";
 
-const randomId = () => randomBytes(8).toString("hex");
+const randomId = () => randomBytes(8);
 
-const TEST_TABLE_CONFIGURATION = { idKey: "id", encoding: "hex" } as const;
+const TEST_TABLE_CONFIGURATION = { idKey: "id" } as const;
 
 const table = new KademliaTable(randomId(), TEST_TABLE_CONFIGURATION);
 
 it("returns the correct distance between ids", () => {
-	const result = KademliaTable.getDistance("0000", "0001", "hex");
+	const result = KademliaTable.getDistance(Buffer.from("0000", "hex"), Buffer.from("0001", "hex"));
 
 	expect(result).toBe(1);
 });
 
 it("creates a compare function that correctly sorts ids by distance", () => {
-	const ids = ["4545", "a5a5", "1111"];
+	const ids = [Buffer.from("4545", "hex"), Buffer.from("a5a5", "hex"), Buffer.from("1111", "hex")];
 
-	const compare = KademliaTable.createCompare("0000", "hex");
+	const compare = KademliaTable.createCompare(Buffer.from("0000", "hex"));
 
-	const result = ids.sort(compare);
+	const result = [...ids].sort(compare);
 
-	expect(result).toStrictEqual(["1111", "4545", "a5a5"]);
+	expect(result).toStrictEqual([ids[2], ids[0], ids[1]]);
 });
 
 it("returns true when node added", () => {
@@ -33,12 +33,12 @@ it("returns true when node added", () => {
 });
 
 it("returns false when node added but bucket full", () => {
-	const customTable = new KademliaTable("00000000", { ...TEST_TABLE_CONFIGURATION, bucketSize: 10 });
+	const customTable = new KademliaTable(Buffer.from("00000000", "hex"), { ...TEST_TABLE_CONFIGURATION, bucketSize: 10 });
 
-	const node = { id: `ffffffff` };
+	const node = { id: Buffer.from(`ffffffff`, "hex") };
 
 	for (let i = 0; i < 20; i++) {
-		customTable.add({ id: `fffffff${i.toString(10)}` });
+		customTable.add({ id: Buffer.from(`fffffff${i.toString(10)}`, "hex") });
 	}
 
 	const result = customTable.add(node);
@@ -74,9 +74,9 @@ it("gets a node", () => {
 });
 
 it("gets correct i for id", () => {
-	const customTable = new KademliaTable("0000", TEST_TABLE_CONFIGURATION);
+	const customTable = new KademliaTable(Buffer.from("0000", "hex"), TEST_TABLE_CONFIGURATION);
 
-	const node = { id: "00ff" };
+	const node = { id: Buffer.from("00ff", "hex") };
 
 	customTable.add(node);
 
@@ -103,14 +103,14 @@ it("gets 20 closest nodes out of 1000", () => {
 });
 
 it("sends node to tail of bucket on seen", () => {
-	const customTable = new KademliaTable("00000000", TEST_TABLE_CONFIGURATION);
+	const customTable = new KademliaTable(Buffer.from("00000000", "hex"), TEST_TABLE_CONFIGURATION);
 
-	const node = { id: `ffffffff` };
+	const node = { id: Buffer.from(`ffffffff`, "hex") };
 
 	customTable.add(node);
 
 	for (let i = 0; i < 10; i++) {
-		customTable.add({ id: `fffffff${i.toString(10)}` });
+		customTable.add({ id: Buffer.from(`fffffff${i.toString(10)}`, "hex") });
 	}
 
 	const result = customTable.seen(node.id);
