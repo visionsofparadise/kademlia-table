@@ -1,3 +1,5 @@
+import { getBitDistance } from "./getBitDistance";
+
 export namespace KademliaTable {
 	export interface Configuration<K extends string> {
 		idKey: K;
@@ -6,28 +8,6 @@ export namespace KademliaTable {
 }
 
 export class KademliaTable<K extends string, N extends { [x in K]: Buffer }> {
-	static getDistance(a: Buffer, b: Buffer) {
-		const length = Math.min(a.length, b.length);
-
-		for (let i = 0; i < length; i++) {
-			const ai = a[i];
-			const bi = b[i];
-
-			if (ai !== bi) return 8 * length - (i * 8 + Math.clz32(ai ^ bi) - 24);
-		}
-
-		return 0;
-	}
-
-	static createCompare(id: Buffer) {
-		return (a: Buffer, b: Buffer) => {
-			const ad = KademliaTable.getDistance(id, a);
-			const bd = KademliaTable.getDistance(id, b);
-
-			return ad > bd ? 1 : ad < bd ? -1 : 0;
-		};
-	}
-
 	readonly idKey: K;
 
 	readonly bucketSize: number;
@@ -49,11 +29,11 @@ export class KademliaTable<K extends string, N extends { [x in K]: Buffer }> {
 	add(node: N) {
 		const i = this.getBucketIndex(node[this.idKey]);
 
+		if (this.has(node[this.idKey], i)) return true;
+
 		const bucket = this.buckets[i];
 
 		if (bucket.length >= this.bucketSize) return false;
-
-		if (this.has(node[this.idKey], i)) return true;
 
 		this.buckets[i] = bucket.concat(node);
 
@@ -69,7 +49,7 @@ export class KademliaTable<K extends string, N extends { [x in K]: Buffer }> {
 	}
 
 	getBucketIndex(id: Buffer) {
-		return KademliaTable.getDistance(this.id, id);
+		return getBitDistance(this.id, id);
 	}
 
 	closest(id: Buffer, limit: number = this.bucketSize) {

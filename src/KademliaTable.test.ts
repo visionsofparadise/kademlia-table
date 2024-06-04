@@ -7,22 +7,6 @@ const TEST_TABLE_CONFIGURATION = { idKey: "id" } as const;
 
 const table = new KademliaTable(randomId(), TEST_TABLE_CONFIGURATION);
 
-it("returns the correct distance between ids", () => {
-	const result = KademliaTable.getDistance(Buffer.from("0000", "hex"), Buffer.from("0001", "hex"));
-
-	expect(result).toBe(1);
-});
-
-it("creates a compare function that correctly sorts ids by distance", () => {
-	const ids = [Buffer.from("4545", "hex"), Buffer.from("a5a5", "hex"), Buffer.from("1111", "hex")];
-
-	const compare = KademliaTable.createCompare(Buffer.from("0000", "hex"));
-
-	const result = [...ids].sort(compare);
-
-	expect(result).toStrictEqual([ids[2], ids[0], ids[1]]);
-});
-
 it("returns true when node added", () => {
 	const node = { id: randomId() };
 
