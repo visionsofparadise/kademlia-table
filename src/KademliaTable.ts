@@ -7,14 +7,14 @@ export namespace KademliaTable {
 	}
 }
 
-export class KademliaTable<K extends string, N extends { [x in K]: Buffer }> {
+export class KademliaTable<K extends string, N extends { [x in K]: Uint8Array }> {
 	readonly idKey: K;
 
 	readonly bucketSize: number;
 	readonly bucketCount: number;
 	readonly buckets: Array<Array<N>>;
 
-	constructor(readonly id: Buffer, configuration: KademliaTable.Configuration<K>) {
+	constructor(readonly id: Uint8Array, configuration: KademliaTable.Configuration<K>) {
 		this.idKey = configuration.idKey;
 
 		this.bucketSize = configuration.bucketSize || 20;
@@ -40,25 +40,25 @@ export class KademliaTable<K extends string, N extends { [x in K]: Buffer }> {
 		return true;
 	}
 
-	has(id: Buffer, i: number = this.getBucketIndex(id)) {
+	has(id: Uint8Array, i: number = this.getBucketIndex(id)) {
 		return this.buckets[i].some((node) => node[this.idKey] === id);
 	}
 
-	get(id: Buffer, i: number = this.getBucketIndex(id)) {
+	get(id: Uint8Array, i: number = this.getBucketIndex(id)) {
 		return this.buckets[i].find((node) => node[this.idKey] === id);
 	}
 
-	getBucketIndex(id: Buffer) {
+	getBucketIndex(id: Uint8Array) {
 		return getBitDistance(this.id, id);
 	}
 
-	closest(id: Buffer, limit: number = this.bucketSize) {
+	closest(id: Uint8Array, limit: number = this.bucketSize) {
 		const i = this.getBucketIndex(id);
 
 		return this.getNodes(i, limit);
 	}
 
-	update(id: Buffer, body: Partial<Omit<N, "id">>) {
+	update(id: Uint8Array, body: Partial<Omit<N, "id">>) {
 		const i = this.getBucketIndex(id);
 
 		if (!this.has(id, i)) return false;
@@ -75,7 +75,7 @@ export class KademliaTable<K extends string, N extends { [x in K]: Buffer }> {
 		return updatedNode;
 	}
 
-	seen(id: Buffer) {
+	seen(id: Uint8Array) {
 		const i = this.getBucketIndex(id);
 
 		const node = this.get(id, i);
@@ -87,7 +87,7 @@ export class KademliaTable<K extends string, N extends { [x in K]: Buffer }> {
 		return true;
 	}
 
-	remove(id: Buffer, i: number = this.getBucketIndex(id)) {
+	remove(id: Uint8Array, i: number = this.getBucketIndex(id)) {
 		this.buckets[i] = this.buckets[i].filter((node) => node[this.idKey] !== id);
 
 		return true;

@@ -1,7 +1,7 @@
 import { getBitDistance } from "./getBitDistance";
 
-export const createCompareBitDistance = (id: Buffer) => {
-	return (a: Buffer, b: Buffer) => {
+export const createCompareBitDistance = (id: Uint8Array) => {
+	return (a: Uint8Array, b: Uint8Array) => {
 		const ad = getBitDistance(id, a);
 		const bd = getBitDistance(id, b);
 
