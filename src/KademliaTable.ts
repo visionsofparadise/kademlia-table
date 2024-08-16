@@ -7,14 +7,14 @@ export namespace KademliaTable {
 	}
 }
 
-export class KademliaTable<K extends string, N extends { [x in K]: Uint8Array }> {
-	readonly idKey: K;
+export class KademliaTable<IdKey extends string, Node extends { [x in IdKey]: Uint8Array }> {
+	readonly idKey: IdKey;
 
 	readonly bucketSize: number;
 	readonly bucketCount: number;
-	readonly buckets: Array<Array<N>>;
+	readonly buckets: Array<Array<Node>>;
 
-	constructor(readonly id: Uint8Array, configuration: KademliaTable.Configuration<K>) {
+	constructor(readonly id: Uint8Array, configuration: KademliaTable.Configuration<IdKey>) {
 		this.idKey = configuration.idKey;
 
 		this.bucketSize = configuration.bucketSize || 20;
@@ -22,14 +22,14 @@ export class KademliaTable<K extends string, N extends { [x in K]: Uint8Array }>
 		this.buckets = Array.apply(null, Array(this.bucketCount)).map(() => []);
 	}
 
-	get nodes() {
+	get nodes(): Array<Node> {
 		return this.buckets.flat();
 	}
 
-	add(node: N) {
+	add(node: Node): boolean {
 		const i = this.getBucketIndex(node[this.idKey]);
 
-		if (this.has(node[this.idKey], i)) return true;
+		if (this.has(node[this.idKey], i)) return false;
 
 		const bucket = this.buckets[i];
 
@@ -40,60 +40,77 @@ export class KademliaTable<K extends string, N extends { [x in K]: Uint8Array }>
 		return true;
 	}
 
-	has(id: Uint8Array, i: number = this.getBucketIndex(id)) {
-		return this.buckets[i].some((node) => node[this.idKey] === id);
+	has(id: Uint8Array, i: number = this.getBucketIndex(id)): boolean {
+		let index = this.buckets[i].length;
+
+		while (index--) {
+			if (Buffer.compare(this.buckets[i][index][this.idKey], id) === 0) return true;
+		}
+
+		return false;
 	}
 
-	get(id: Uint8Array, i: number = this.getBucketIndex(id)) {
-		return this.buckets[i].find((node) => node[this.idKey] === id);
+	get(id: Uint8Array, i: number = this.getBucketIndex(id)): Node | undefined {
+		let index = this.buckets[i].length;
+
+		while (index--) {
+			const node = this.buckets[i][index];
+
+			if (Buffer.compare(node[this.idKey], id) === 0) return node;
+		}
+
+		return undefined;
 	}
 
-	getBucketIndex(id: Uint8Array) {
+	getBucketIndex(id: Uint8Array): number {
 		return getBitDistance(this.id, id);
 	}
 
-	closest(id: Uint8Array, limit: number = this.bucketSize) {
+	closest(id: Uint8Array, limit: number = this.bucketSize): Array<Node> {
 		const i = this.getBucketIndex(id);
 
 		return this.getNodes(i, limit);
 	}
 
-	update(id: Uint8Array, body: Partial<Omit<N, "id">>) {
+	update(id: Uint8Array, body: Partial<Omit<Node, "id">>): Partial<Omit<Node, "id">> | undefined {
 		const i = this.getBucketIndex(id);
 
-		if (!this.has(id, i)) return false;
+		const index = this.buckets[i].findIndex((node) => Buffer.compare(node[this.idKey], id) === 0);
 
-		const index = this.buckets[i].findIndex((node) => node[this.idKey] === id);
+		if (index === -1) return undefined;
 
-		const updatedNode = {
-			...this.buckets[i][index],
-			...body,
-		};
+		for (const key in body) {
+			this.buckets[i][index][key as keyof Node] = body[key as keyof typeof body] as Node[keyof Node];
+		}
 
-		this.buckets[i][index] = updatedNode;
-
-		return updatedNode;
+		return body;
 	}
 
-	seen(id: Uint8Array) {
+	seen(id: Uint8Array): boolean {
 		const i = this.getBucketIndex(id);
 
 		const node = this.get(id, i);
 
-		if (!node) return false;
+		const removeResult = this.remove(id, i);
 
-		this.buckets[i] = this.buckets[i].filter((node) => node[this.idKey] !== id).concat([node]);
+		if (!node || !removeResult) return false;
 
-		return true;
-	}
-
-	remove(id: Uint8Array, i: number = this.getBucketIndex(id)) {
-		this.buckets[i] = this.buckets[i].filter((node) => node[this.idKey] !== id);
+		this.add(node);
 
 		return true;
 	}
 
-	protected getNodes(i0: number, limit: number, depth: number = 0): Array<N> {
+	remove(id: Uint8Array, i: number = this.getBucketIndex(id)): boolean {
+		const index = this.buckets[i].findIndex((node) => Buffer.compare(node[this.idKey], id) === 0);
+
+		if (index === -1) return false;
+
+		this.buckets[i].splice(index, 1);
+
+		return true;
+	}
+
+	protected getNodes(i0: number, limit: number, depth: number = 0): Array<Node> {
 		const offset = (depth % 2 === 0 ? 1 : -1) * Math.ceil(depth / 2);
 
 		if (Math.abs(offset) > Math.max(i0, this.bucketCount - 1 - i0)) return [];

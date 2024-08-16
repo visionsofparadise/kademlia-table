@@ -72,12 +72,12 @@ Create a new routing table.
 
 #### `bool = table.add(node)`
 
-Insert a new node. `node[idKey]` must be a string of same or shorter length as `table[idKey]`.
+Insert a new node. `node[idKey]` must be a buffer of same or shorter length as `table[idKey]`.
 When inserting a node the XOR distance between the node and the table[idKey] is
 calculated and used to figure which bucket this node should be inserted into.
 
-Returns `true` if the node could be added or already exists.
-Returns `false` if the bucket is full.
+Returns `true` if the node is newly added.
+Returns `false` if the bucket is full or already exists.
 
 #### `bool = table.has(id)`
 
@@ -102,6 +102,9 @@ in a DHT should store a value based on its id.
 
 Remove a node using its id.
 
+Returns `true` if the node is removed.
+Returns `false` if the node does not exist.
+
 #### `table.nodes`
 
 Returns all nodes from table as an array. Ordered from closest to furthest buckets.
@@ -112,7 +115,7 @@ A fixed size array of all buckets in the table.
 
 #### `number = getBitDistance(idA, idB)`
 
-Gets the XOR distance between two id strings.
+Gets the XOR distance between two id buffers.
 
 #### `1 | -1 | 0 = compareBitDistance(idA, idB) = createCompareBitDistance(id)`
 
