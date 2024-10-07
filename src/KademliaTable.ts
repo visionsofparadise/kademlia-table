@@ -1,128 +1,150 @@
-import { getBitDistance } from "./getBitDistance";
+import { getBitwiseDistance } from "./getBitwiseDistance";
 
 export namespace KademliaTable {
-	export interface Configuration<K extends string> {
-		idKey: K;
+	export interface Options<Node> {
 		bucketSize?: number;
+		compare?: (nodeA: Node, nodeB: Node) => number;
+		getId: (node: Node) => Uint8Array;
 	}
 }
 
-export class KademliaTable<IdKey extends string, Node extends { [x in IdKey]: Uint8Array }> {
-	readonly idKey: IdKey;
-
+export class KademliaTable<Node> {
 	readonly bucketSize: number;
-	readonly bucketCount: number;
 	readonly buckets: Array<Array<Node>>;
+	compare?: (nodeA: Node, nodeB: Node) => number;
+	getId: (node: Node) => Uint8Array;
+	private _length: number = 0;
 
-	constructor(readonly id: Uint8Array, configuration: KademliaTable.Configuration<IdKey>) {
-		this.idKey = configuration.idKey;
-
-		this.bucketSize = configuration.bucketSize || 20;
-		this.bucketCount = id.length * 8 + 1;
-		this.buckets = Array.apply(null, Array(this.bucketCount)).map(() => []);
+	constructor(public readonly id: Uint8Array, options: KademliaTable.Options<Node>) {
+		this.bucketSize = options.bucketSize || 20;
+		this.buckets = new Array(id.length * 8 + 1).fill([]);
+		this.compare = options.compare || (() => 0);
+		this.getId = options.getId;
 	}
 
-	get nodes(): Array<Node> {
-		return this.buckets.flat();
+	get length() {
+		return this._length;
 	}
 
-	add(node: Node): boolean {
-		const i = this.getBucketIndex(node[this.idKey]);
+	*[Symbol.iterator]() {
+		for (const bucket of this.buckets) for (const node of bucket) yield node;
+	}
 
-		if (this.has(node[this.idKey], i)) return false;
+	add(node: Node, d: number = this.getBitwiseDistance(this.getId(node))): boolean {
+		if (this.has(this.getId(node), d)) return false;
 
-		const bucket = this.buckets[i];
+		const bucket = this.buckets[d].slice(0);
 
-		if (bucket.length >= this.bucketSize) return false;
+		if (bucket.length < this.bucketSize) {
+			this.buckets[d].push(node);
 
-		this.buckets[i] = bucket.concat(node);
+			this._length++;
+
+			return true;
+		}
+
+		bucket.push(node);
+
+		const sortedBucket = bucket.sort(this.compare);
+
+		this.buckets[d] = sortedBucket.slice(0, this.bucketSize);
+
+		const removedNode = sortedBucket.at(-1)!;
+
+		if (Buffer.compare(this.getId(node), this.getId(removedNode)) === 0) return false;
+
+		this._length++;
 
 		return true;
 	}
 
-	has(id: Uint8Array, i: number = this.getBucketIndex(id)): boolean {
-		let index = this.buckets[i].length;
+	clear() {
+		for (let i = 0; i < this.buckets.length; i++) this.buckets[i] = [];
 
-		while (index--) {
-			if (Buffer.compare(this.buckets[i][index][this.idKey], id) === 0) return true;
-		}
-
-		return false;
+		this._length = 0;
 	}
 
-	get(id: Uint8Array, i: number = this.getBucketIndex(id)): Node | undefined {
-		let index = this.buckets[i].length;
+	listClosestToId(id: Uint8Array, limit: number = this.buckets.length * this.bucketSize): Array<Node> {
+		const d = this.getBitwiseDistance(id);
 
-		while (index--) {
-			const node = this.buckets[i][index];
-
-			if (Buffer.compare(node[this.idKey], id) === 0) return node;
-		}
-
-		return undefined;
+		return this.getNodes(d, limit);
 	}
 
-	getBucketIndex(id: Uint8Array): number {
-		return getBitDistance(this.id, id);
+	get(d: number): Node | undefined {
+		const node = this.buckets[d].shift();
+
+		if (node) this.buckets[d].push(node);
+
+		return node;
 	}
 
-	closest(id: Uint8Array, limit: number = this.bucketSize): Array<Node> {
-		const i = this.getBucketIndex(id);
-
-		return this.getNodes(i, limit);
-	}
-
-	update(id: Uint8Array, body: Partial<Omit<Node, "id">>): Partial<Omit<Node, "id">> | undefined {
-		const i = this.getBucketIndex(id);
-
-		const index = this.buckets[i].findIndex((node) => Buffer.compare(node[this.idKey], id) === 0);
+	getById(id: Uint8Array, d: number = this.getBitwiseDistance(id)): Node | undefined {
+		const index = this.buckets[d].findIndex((node) => Buffer.compare(this.getId(node), id) === 0);
 
 		if (index === -1) return undefined;
 
-		for (const key in body) {
-			this.buckets[i][index][key as keyof Node] = body[key as keyof typeof body] as Node[keyof Node];
-		}
+		const node = this.buckets[d][index];
 
-		return body;
+		this.buckets[d] = this.buckets[d].splice(index, 1).concat(node);
+
+		return node;
 	}
 
-	seen(id: Uint8Array): boolean {
-		const i = this.getBucketIndex(id);
-
-		const node = this.get(id, i);
-
-		const removeResult = this.remove(id, i);
-
-		if (!node || !removeResult) return false;
-
-		this.add(node);
-
-		return true;
+	getBitwiseDistance(id: Uint8Array): number {
+		return getBitwiseDistance(this.id, id);
 	}
 
-	remove(id: Uint8Array, i: number = this.getBucketIndex(id)): boolean {
-		const index = this.buckets[i].findIndex((node) => Buffer.compare(node[this.idKey], id) === 0);
-
-		if (index === -1) return false;
-
-		this.buckets[i].splice(index, 1);
-
-		return true;
-	}
-
-	protected getNodes(i0: number, limit: number, depth: number = 0): Array<Node> {
+	protected getNodes(d: number, limit: number, depth: number = 0): Array<Node> {
 		const offset = (depth % 2 === 0 ? 1 : -1) * Math.ceil(depth / 2);
 
-		if (Math.abs(offset) > Math.max(i0, this.bucketCount - 1 - i0)) return [];
+		if (Math.abs(offset) > Math.max(d, this.buckets.length - 1 - d)) return [];
 
-		const i = i0 + offset;
+		const i = d + offset;
 
-		if (0 > i || i > this.bucketCount - 1) return this.getNodes(i0, limit, depth + 1);
+		if (0 > i || i > this.buckets.length - 1) return this.getNodes(d, limit, depth + 1);
 
 		const nodes = this.buckets[i].slice(0, limit);
 
-		if (nodes.length >= limit) return nodes;
+		if (nodes.length >= limit) {
+			this.buckets[i] = this.buckets[i].slice(nodes.length).concat(this.buckets[i].slice(0, nodes.length));
 
-		return nodes.concat(this.getNodes(i0, limit - nodes.length, depth + 1));
+			return nodes;
+		}
+
+		return nodes.concat(this.getNodes(d, limit - nodes.length, depth + 1));
+	}
+
+	has(id: Uint8Array, d: number = this.getBitwiseDistance(id)): boolean {
+		return !!this.buckets[d].find((node) => Buffer.compare(this.getId(node), id) === 0);
+	}
+
+	peek(d: number): Node | undefined {
+		return this.buckets[d].at(0);
+	}
+
+	peekById(id: Uint8Array, d: number = this.getBitwiseDistance(id)): Node | undefined {
+		return this.buckets[d].find((node) => Buffer.compare(this.getId(node), id) === 0);
+	}
+
+	update(node: Node, d: number = this.getBitwiseDistance(this.getId(node))): boolean {
+		const index = this.buckets[d].findIndex((n) => Buffer.compare(this.getId(n), this.getId(node)) === 0);
+
+		if (index === -1) return false;
+
+		this.buckets[d][index] = node;
+
+		return true;
+	}
+
+	remove(id: Uint8Array, d: number = this.getBitwiseDistance(id)): boolean {
+		const index = this.buckets[d].findIndex((node) => Buffer.compare(this.getId(node), id) === 0);
+
+		if (index === -1) return false;
+
+		this.buckets[d].splice(index, 1);
+
+		this._length--;
+
+		return true;
 	}
 }

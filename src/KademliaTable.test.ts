@@ -3,40 +3,40 @@ import { KademliaTable } from ".";
 
 const randomId = () => randomBytes(8);
 
-const TEST_TABLE_CONFIGURATION = { idKey: "id" } as const;
+const TEST_TABLE_CONFIGURATION: KademliaTable.Options<Buffer> = { getId: (node) => node };
 
 const table = new KademliaTable(randomId(), TEST_TABLE_CONFIGURATION);
 
 it("returns true when node added", () => {
-	const node = { id: randomId() };
+	const node = randomId();
 
 	const result = table.add(node);
 
 	expect(result).toBe(true);
-	expect(table.nodes.length).toBe(1);
+	expect(table.length).toBe(1);
 });
 
 it("returns false when node added but bucket full", () => {
 	const customTable = new KademliaTable(Buffer.from("00000000", "hex"), { ...TEST_TABLE_CONFIGURATION, bucketSize: 10 });
 
-	const node = { id: Buffer.from(`ffffffff`, "hex") };
+	const node = Buffer.from(`ffffffff`, "hex");
 
 	for (let i = 0; i < 20; i++) {
-		customTable.add({ id: Buffer.from(`fffffff${i.toString(10)}`, "hex") });
+		customTable.add(Buffer.from(`fffffff${i.toString(10)}`, "hex"));
 	}
 
 	const result = customTable.add(node);
 
 	expect(result).toBe(false);
-	expect(customTable.nodes.length).toBe(10);
+	expect(customTable.length).toBe(10);
 });
 
 it("returns true when table has node", () => {
-	const node = { id: randomId() };
+	const node = randomId();
 
 	table.add(node);
 
-	const result = table.has(node.id);
+	const result = table.has(node);
 
 	expect(result).toBe(true);
 });
@@ -48,57 +48,74 @@ it("returns false when table does not have node", () => {
 });
 
 it("gets a node", () => {
-	const node = { id: randomId() };
+	const node = randomId();
 
 	table.add(node);
 
-	const resultNode = table.get(node.id);
+	const resultNode = table.getById(node);
 
 	expect(resultNode).toStrictEqual(node);
 });
 
-it("gets correct i for id", () => {
+it("gets correct d for id", () => {
 	const customTable = new KademliaTable(Buffer.from("0000", "hex"), TEST_TABLE_CONFIGURATION);
 
-	const node = { id: Buffer.from("00ff", "hex") };
+	const node = Buffer.from("00ff", "hex");
 
 	customTable.add(node);
 
-	const i = customTable.getBucketIndex(node.id);
+	const d = customTable.getBitwiseDistance(node);
 
-	expect(i).toBe(8);
+	expect(d).toBe(8);
 });
 
 it("gets 20 closest nodes out of 1000", () => {
 	const customTable = new KademliaTable(randomId(), TEST_TABLE_CONFIGURATION);
 
-	const node = { id: randomId() };
+	const node = randomId();
 
 	customTable.add(node);
 
 	for (let i = 0; i < 1000; i++) {
-		customTable.add({ id: randomId() });
+		customTable.add(randomId());
 	}
 
-	const closestNodeIds = customTable.closest(node.id, 20);
+	const closestNodes = customTable.listClosestToId(node, 20);
 
-	expect(closestNodeIds[0]).toStrictEqual(node);
-	expect(closestNodeIds.length).toBe(20);
+	expect(closestNodes[0]).toStrictEqual(node);
+	expect(closestNodes.length).toBe(20);
 });
 
-it("sends node to tail of bucket on seen", () => {
+it("sends node to tail of bucket on get", () => {
 	const customTable = new KademliaTable(Buffer.from("00000000", "hex"), TEST_TABLE_CONFIGURATION);
 
-	const node = { id: Buffer.from(`ffffffff`, "hex") };
+	const node = Buffer.from(`ffffffff`, "hex");
 
 	customTable.add(node);
 
 	for (let i = 0; i < 10; i++) {
-		customTable.add({ id: Buffer.from(`fffffff${i.toString(10)}`, "hex") });
+		customTable.add(Buffer.from(`fffffff${i.toString(10)}`, "hex"));
 	}
 
-	const result = customTable.seen(node.id);
+	const result = customTable.getById(node);
 
-	expect(result).toBe(true);
-	expect(customTable.nodes[10]).toStrictEqual(node);
+	expect(result).toStrictEqual(node);
+	expect(customTable.buckets[customTable.getBitwiseDistance(node)].at(-1)).toStrictEqual(node);
+});
+
+it("does not send node to tail of bucket on peek", () => {
+	const customTable = new KademliaTable(Buffer.from("00000000", "hex"), TEST_TABLE_CONFIGURATION);
+
+	const node = Buffer.from(`ffffffff`, "hex");
+
+	customTable.add(node);
+
+	for (let i = 0; i < 10; i++) {
+		customTable.add(Buffer.from(`fffffff${i.toString(10)}`, "hex"));
+	}
+
+	const result = customTable.peekById(node);
+
+	expect(result).toStrictEqual(node);
+	expect(customTable.buckets[customTable.getBitwiseDistance(node)].at(0)).toStrictEqual(node);
 });

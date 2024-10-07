@@ -1,3 +1,3 @@
+export { createCompareBitwiseDistance as createCompareBitDistance } from "./createCompareBitwiseDistance";
+export { getBitwiseDistance as getBitDistance } from "./getBitwiseDistance";
 export { KademliaTable } from "./KademliaTable";
-export { createCompareBitDistance } from "./createCompareBitDistance";
-export { getBitDistance } from "./getBitDistance";
