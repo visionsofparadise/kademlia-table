@@ -26,7 +26,7 @@ export class KademliaTable<Node> {
 		return this._length;
 	}
 
-	*[Symbol.iterator]() {
+	*[Symbol.iterator](): IterableIterator<Node> {
 		for (const bucket of this.buckets) for (const node of bucket) yield node;
 	}
 
