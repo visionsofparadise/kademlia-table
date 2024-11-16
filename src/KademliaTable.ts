@@ -13,17 +13,16 @@ export class KademliaTable<Node> {
 	readonly buckets: Array<Array<Node>>;
 	compare?: (nodeA: Node, nodeB: Node) => number;
 	getId: (node: Node) => Uint8Array;
-	private _length: number = 0;
 
 	constructor(public readonly id: Uint8Array, options: KademliaTable.Options<Node>) {
 		this.bucketSize = options.bucketSize || 20;
-		this.buckets = new Array(id.length * 8 + 1).fill([]);
+		this.buckets = new Array(id.length * 8 + 1).fill(undefined).map(() => []);
 		this.compare = options.compare || (() => 0);
 		this.getId = options.getId;
 	}
 
 	get length() {
-		return this._length;
+		return this.buckets.reduce((sum, bucket) => sum + bucket.length, 0);
 	}
 
 	*[Symbol.iterator](): IterableIterator<Node> {
@@ -33,15 +32,13 @@ export class KademliaTable<Node> {
 	add(node: Node, d: number = this.getBitwiseDistance(this.getId(node))): boolean {
 		if (this.has(this.getId(node), d)) return false;
 
-		const bucket = this.buckets[d].slice(0);
-
-		if (bucket.length < this.bucketSize) {
+		if (this.buckets[d].length < this.bucketSize) {
 			this.buckets[d].push(node);
-
-			this._length++;
 
 			return true;
 		}
+
+		const bucket = this.buckets[d].slice(0);
 
 		bucket.push(node);
 
@@ -53,15 +50,11 @@ export class KademliaTable<Node> {
 
 		if (Buffer.compare(this.getId(node), this.getId(removedNode)) === 0) return false;
 
-		this._length++;
-
 		return true;
 	}
 
 	clear() {
 		for (let i = 0; i < this.buckets.length; i++) this.buckets[i] = [];
-
-		this._length = 0;
 	}
 
 	listClosestToId(id: Uint8Array, limit: number = this.buckets.length * this.bucketSize): Array<Node> {
@@ -142,8 +135,6 @@ export class KademliaTable<Node> {
 		if (index === -1) return false;
 
 		this.buckets[d].splice(index, 1);
-
-		this._length--;
 
 		return true;
 	}

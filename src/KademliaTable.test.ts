@@ -5,9 +5,9 @@ const randomId = () => randomBytes(8);
 
 const TEST_TABLE_CONFIGURATION: KademliaTable.Options<Buffer> = { getId: (node) => node };
 
-const table = new KademliaTable(randomId(), TEST_TABLE_CONFIGURATION);
-
 it("returns true when node added", () => {
+	const table = new KademliaTable(randomId(), TEST_TABLE_CONFIGURATION);
+
 	const node = randomId();
 
 	const result = table.add(node);
@@ -32,6 +32,8 @@ it("returns false when node added but bucket full", () => {
 });
 
 it("returns true when table has node", () => {
+	const table = new KademliaTable(randomId(), TEST_TABLE_CONFIGURATION);
+
 	const node = randomId();
 
 	table.add(node);
@@ -42,12 +44,16 @@ it("returns true when table has node", () => {
 });
 
 it("returns false when table does not have node", () => {
+	const table = new KademliaTable(randomId(), TEST_TABLE_CONFIGURATION);
+
 	const result = table.has(randomId());
 
 	expect(result).toBe(false);
 });
 
 it("gets a node", () => {
+	const table = new KademliaTable(randomId(), TEST_TABLE_CONFIGURATION);
+
 	const node = randomId();
 
 	table.add(node);
