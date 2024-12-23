@@ -1,3 +1,4 @@
+import { compare } from "uint8array-tools";
 import { getBitwiseDistance } from "./getBitwiseDistance";
 
 export namespace KademliaTable {
@@ -48,7 +49,7 @@ export class KademliaTable<Node> {
 
 		const removedNode = sortedBucket.at(-1)!;
 
-		if (Buffer.compare(this.getId(node), this.getId(removedNode)) === 0) return false;
+		if (compare(this.getId(node), this.getId(removedNode)) === 0) return false;
 
 		return true;
 	}
@@ -72,7 +73,7 @@ export class KademliaTable<Node> {
 	}
 
 	getById(id: Uint8Array, d: number = this.getBitwiseDistance(id)): Node | undefined {
-		const index = this.buckets[d].findIndex((node) => Buffer.compare(this.getId(node), id) === 0);
+		const index = this.buckets[d].findIndex((node) => compare(this.getId(node), id) === 0);
 
 		if (index === -1) return undefined;
 
@@ -108,7 +109,7 @@ export class KademliaTable<Node> {
 	}
 
 	has(id: Uint8Array, d: number = this.getBitwiseDistance(id)): boolean {
-		return !!this.buckets[d].find((node) => Buffer.compare(this.getId(node), id) === 0);
+		return !!this.buckets[d].find((node) => compare(this.getId(node), id) === 0);
 	}
 
 	peek(d: number): Node | undefined {
@@ -116,11 +117,11 @@ export class KademliaTable<Node> {
 	}
 
 	peekById(id: Uint8Array, d: number = this.getBitwiseDistance(id)): Node | undefined {
-		return this.buckets[d].find((node) => Buffer.compare(this.getId(node), id) === 0);
+		return this.buckets[d].find((node) => compare(this.getId(node), id) === 0);
 	}
 
 	update(node: Node, d: number = this.getBitwiseDistance(this.getId(node))): boolean {
-		const index = this.buckets[d].findIndex((n) => Buffer.compare(this.getId(n), this.getId(node)) === 0);
+		const index = this.buckets[d].findIndex((n) => compare(this.getId(n), this.getId(node)) === 0);
 
 		if (index === -1) return false;
 
@@ -130,7 +131,7 @@ export class KademliaTable<Node> {
 	}
 
 	remove(id: Uint8Array, d: number = this.getBitwiseDistance(id)): boolean {
-		const index = this.buckets[d].findIndex((node) => Buffer.compare(this.getId(node), id) === 0);
+		const index = this.buckets[d].findIndex((node) => compare(this.getId(node), id) === 0);
 
 		if (index === -1) return false;
 

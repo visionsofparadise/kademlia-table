@@ -18,7 +18,7 @@ An extendable implementation of Kademlia and K-Buckets closely following details
 import { KademliaTable } from "kademlia-table";
 
 interface Node {
-	id: Buffer;
+	id: Uint8Array;
 	// ...properties of Node
 }
 
@@ -48,7 +48,7 @@ for (const node of table) {
 
 Create a new routing table.
 
-`id` should be a Buffer that is uniformily distributed. `options` includes:
+`id` should be a Uint8Array that is uniformily distributed. `options` includes:
 
 ```js
 {
