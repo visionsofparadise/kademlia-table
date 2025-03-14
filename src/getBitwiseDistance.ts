@@ -1,4 +1,4 @@
-export const getBitwiseDistance = (a: Uint8Array, b: Uint8Array, byteLength: number = Math.min(a.length, b.length)) => {
+export const getBitwiseDistance = (a: Uint8Array, b: Uint8Array, byteLength: number = Math.min(a.byteLength, b.byteLength)) => {
 	for (let i = 0; i < byteLength; i++) {
 		const ai = a[i];
 		const bi = b[i];

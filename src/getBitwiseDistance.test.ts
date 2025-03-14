@@ -1,8 +1,8 @@
 import { getBitwiseDistance } from "./getBitwiseDistance";
 
 it("returns the correct distance between buffers", () => {
-	const bufferA = Buffer.from("0000", "hex");
-	const bufferB = Buffer.from("0001", "hex");
+	const bufferA = Uint8Array.from([0, 0, 0, 0]);
+	const bufferB = Uint8Array.from([0, 0, 0, 1]);
 
 	const result = getBitwiseDistance(bufferA, bufferB);
 

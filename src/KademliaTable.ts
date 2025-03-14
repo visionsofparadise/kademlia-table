@@ -79,7 +79,8 @@ export class KademliaTable<Node> {
 
 		const node = this.buckets[d][index];
 
-		this.buckets[d] = this.buckets[d].splice(index, 1).concat(node);
+		this.buckets[d].splice(index, 1);
+		this.buckets[d].push(node);
 
 		return node;
 	}
