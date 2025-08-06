@@ -58,6 +58,12 @@ export class KademliaTable<Node> {
 		for (let i = 0; i < this.buckets.length; i++) this.buckets[i] = [];
 	}
 
+	*iterateClosestToId(id: Uint8Array): IterableIterator<Node> {
+		const d = this.getBitwiseDistance(id);
+
+		return this.iterateNodes(d);
+	}
+
 	listClosestToId(id: Uint8Array, limit: number = this.buckets.length * this.bucketSize): Array<Node> {
 		const d = this.getBitwiseDistance(id);
 
@@ -89,24 +95,44 @@ export class KademliaTable<Node> {
 		return getBitwiseDistance(this.id, id);
 	}
 
-	protected getNodes(d: number, limit: number, depth: number = 0): Array<Node> {
-		const offset = (depth % 2 === 0 ? 1 : -1) * Math.ceil(depth / 2);
+	protected getNodes(d: number, limit: number): Array<Node> {
+		if (!limit) return [];
 
-		if (Math.abs(offset) > Math.max(d, this.buckets.length - 1 - d)) return [];
+		const nodes: Array<Node> = [];
 
-		const i = d + offset;
+		for (const node of this.iterateNodes(d)) {
+			nodes.push(node);
 
-		if (0 > i || i > this.buckets.length - 1) return this.getNodes(d, limit, depth + 1);
-
-		const nodes = this.buckets[i].slice(0, limit);
-
-		if (nodes.length >= limit) {
-			this.buckets[i] = this.buckets[i].slice(nodes.length).concat(this.buckets[i].slice(0, nodes.length));
-
-			return nodes;
+			if (nodes.length >= limit) return nodes;
 		}
 
-		return nodes.concat(this.getNodes(d, limit - nodes.length, depth + 1));
+		return nodes;
+	}
+
+	protected *iterateNodes(d: number): IterableIterator<Node> {
+		let depth = 0;
+		let offset = (depth % 2 === 0 ? 1 : -1) * Math.ceil(depth / 2);
+
+		while (Math.abs(offset) <= Math.max(d, this.buckets.length - 1 - d)) {
+			const i = d + offset;
+
+			if (0 <= i || i <= this.buckets.length - 1) {
+				const bucket = this.buckets[i];
+
+				for (let i = 0; i < bucket.length; i++) {
+					const node = this.buckets[d].shift();
+
+					if (node) {
+						this.buckets[d].push(node);
+
+						yield node;
+					}
+				}
+			}
+
+			depth++;
+			offset = (depth % 2 === 0 ? 1 : -1) * Math.ceil(depth / 2);
+		}
 	}
 
 	has(id: Uint8Array, d: number = this.getBitwiseDistance(id)): boolean {
