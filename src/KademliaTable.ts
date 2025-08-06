@@ -59,15 +59,11 @@ export class KademliaTable<Node> {
 	}
 
 	*iterateClosestToId(id: Uint8Array): IterableIterator<Node> {
-		const d = this.getBitwiseDistance(id);
-
-		return this.iterateNodes(d);
+		return this.iterateNodes(id);
 	}
 
 	listClosestToId(id: Uint8Array, limit: number = this.buckets.length * this.bucketSize): Array<Node> {
-		const d = this.getBitwiseDistance(id);
-
-		return this.getNodes(d, limit);
+		return this.getNodes(id, undefined, limit);
 	}
 
 	get(d: number): Node | undefined {
@@ -95,12 +91,12 @@ export class KademliaTable<Node> {
 		return getBitwiseDistance(this.id, id);
 	}
 
-	protected getNodes(d: number, limit: number): Array<Node> {
+	protected getNodes(id: Uint8Array, d: number = this.getBitwiseDistance(id), limit: number = this.buckets.length * this.bucketSize): Array<Node> {
 		if (!limit) return [];
 
 		const nodes: Array<Node> = [];
 
-		for (const node of this.iterateNodes(d)) {
+		for (const node of this.iterateNodes(id, d)) {
 			nodes.push(node);
 
 			if (nodes.length >= limit) return nodes;
@@ -109,7 +105,7 @@ export class KademliaTable<Node> {
 		return nodes;
 	}
 
-	protected *iterateNodes(d: number): IterableIterator<Node> {
+	protected *iterateNodes(id: Uint8Array, d: number = this.getBitwiseDistance(id)): IterableIterator<Node> {
 		let depth = 0;
 		let offset = (depth % 2 === 0 ? 1 : -1) * Math.ceil(depth / 2);
 
@@ -117,7 +113,7 @@ export class KademliaTable<Node> {
 			const i = d + offset;
 
 			if (0 <= i || i <= this.buckets.length - 1) {
-				const bucket = this.buckets[i];
+				const bucket = this.buckets[i].slice(0).sort((nodeA, nodeB) => getBitwiseDistance(this.getId(nodeA), id) - getBitwiseDistance(this.getId(nodeB), id));
 
 				for (let i = 0; i < bucket.length; i++) {
 					const node = this.buckets[d].shift();
