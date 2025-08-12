@@ -106,23 +106,25 @@ export class KademliaTable<Node> {
 	}
 
 	protected *iterateNodes(id: Uint8Array, d: number = this.getBitwiseDistance(id)): IterableIterator<Node> {
+		const bucketLimit = Math.max(d, this.buckets.length - 1 - d);
+
 		let depth = 0;
 		let offset = (depth % 2 === 0 ? 1 : -1) * Math.ceil(depth / 2);
 
-		while (Math.abs(offset) <= Math.max(d, this.buckets.length - 1 - d)) {
+		while (Math.abs(offset) <= bucketLimit) {
 			const i = d + offset;
 
-			if (0 <= i || i < this.buckets.length) {
+			if (0 <= i && i < this.buckets.length) {
 				const bucket = this.buckets[i];
 
-				if (!bucket) continue;
+				if (bucket) {
+					const ids = bucket.map((node) => this.getId(node));
 
-				const ids = bucket.map((node) => this.getId(node));
+					for (const id of ids) {
+						const node = this.getById(id, i);
 
-				for (const id of ids) {
-					const node = this.getById(id, i);
-
-					if (node) yield node;
+						if (node) yield node;
+					}
 				}
 			}
 
