@@ -113,16 +113,18 @@ export class KademliaTable<Node> {
 			const i = d + offset;
 
 			if (0 <= i || i <= this.buckets.length - 1) {
-				const bucket = this.buckets[i].slice(0).sort((nodeA, nodeB) => getBitwiseDistance(this.getId(nodeA), id) - getBitwiseDistance(this.getId(nodeB), id));
+				const bucket = this.buckets[i];
 
-				for (let i = 0; i < bucket.length; i++) {
-					const node = this.buckets[d].shift();
+				if (!bucket) continue;
 
-					if (node) {
-						this.buckets[d].push(node);
+				for (let j = 0; j < bucket.length; j++) {
+					const node = this.buckets[i].shift();
 
-						yield node;
-					}
+					if (!node) break;
+
+					this.buckets[i].push(node);
+
+					yield node;
 				}
 			}
 
