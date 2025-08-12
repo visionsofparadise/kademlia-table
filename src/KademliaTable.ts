@@ -112,19 +112,17 @@ export class KademliaTable<Node> {
 		while (Math.abs(offset) <= Math.max(d, this.buckets.length - 1 - d)) {
 			const i = d + offset;
 
-			if (0 <= i || i <= this.buckets.length - 1) {
+			if (0 <= i || i < this.buckets.length) {
 				const bucket = this.buckets[i];
 
 				if (!bucket) continue;
 
-				for (let j = 0; j < bucket.length; j++) {
-					const node = this.buckets[i].shift();
+				const ids = bucket.map((node) => this.getId(node));
 
-					if (!node) break;
+				for (const id of ids) {
+					const node = this.getById(id, i);
 
-					this.buckets[i].push(node);
-
-					yield node;
+					if (node) yield node;
 				}
 			}
 
