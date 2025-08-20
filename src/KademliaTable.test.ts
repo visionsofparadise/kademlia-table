@@ -1,9 +1,12 @@
-import { randomBytes } from "node:crypto";
+import { compare } from "uint8array-tools";
 import { KademliaTable } from ".";
 
-const randomId = () => randomBytes(8);
+const crypto = require("crypto").webcrypto;
+global.crypto = crypto;
 
-const TEST_TABLE_CONFIGURATION: KademliaTable.Options<Buffer> = { getId: (node) => node };
+const randomId = () => crypto.getRandomValues(new Uint8Array(8));
+
+const TEST_TABLE_CONFIGURATION: KademliaTable.Options<Uint8Array> = { getId: (node) => node };
 
 it("returns true when node added", () => {
 	const table = new KademliaTable(randomId(), TEST_TABLE_CONFIGURATION);
@@ -17,12 +20,16 @@ it("returns true when node added", () => {
 });
 
 it("returns false when node added but bucket full", () => {
-	const customTable = new KademliaTable(Buffer.from("00000000", "hex"), { ...TEST_TABLE_CONFIGURATION, bucketSize: 10 });
+	const customTable = new KademliaTable(new Uint8Array(8).fill(0x00), { ...TEST_TABLE_CONFIGURATION, bucketSize: 10 });
 
-	const node = Buffer.from(`ffffffff`, "hex");
+	const node = new Uint8Array(8).fill(0xff);
 
 	for (let i = 0; i < 20; i++) {
-		customTable.add(Buffer.from(`fffffff${i.toString(10)}`, "hex"));
+		const nodeI = new Uint8Array(8).fill(0xff);
+
+		nodeI.set([i], 7);
+
+		customTable.add(nodeI);
 	}
 
 	const result = customTable.add(node);
@@ -58,19 +65,21 @@ it("gets a node", () => {
 
 	table.add(node);
 
-	const resultNode = table.getById(node);
+	const resultNode = table.get(node);
 
-	expect(resultNode).toStrictEqual(node);
+	expect(compare(node, resultNode!)).toBe(0);
 });
 
 it("gets correct d for id", () => {
-	const customTable = new KademliaTable(Buffer.from("0000", "hex"), TEST_TABLE_CONFIGURATION);
+	const customTable = new KademliaTable(new Uint8Array(8).fill(0x00), TEST_TABLE_CONFIGURATION);
 
-	const node = Buffer.from("00ff", "hex");
+	const node = new Uint8Array(8).fill(0x00);
+
+	node.set([0xff], 7);
 
 	customTable.add(node);
 
-	const d = customTable.getBitwiseDistance(node);
+	const d = customTable.getDistance(node);
 
 	expect(d).toBe(8);
 });
@@ -92,36 +101,24 @@ it("gets 20 closest nodes out of 1000", () => {
 	expect(closestNodes.length).toBe(20);
 });
 
-it("sends node to tail of bucket on get", () => {
-	const customTable = new KademliaTable(Buffer.from("00000000", "hex"), TEST_TABLE_CONFIGURATION);
+it("sends node to tail of bucket on markSuccess", () => {
+	const customTable = new KademliaTable(new Uint8Array(8).fill(0x00), TEST_TABLE_CONFIGURATION);
 
-	const node = Buffer.from(`ffffffff`, "hex");
-
-	customTable.add(node);
-
-	for (let i = 0; i < 10; i++) {
-		customTable.add(Buffer.from(`fffffff${i.toString(10)}`, "hex"));
-	}
-
-	const result = customTable.getById(node);
-
-	expect(result).toStrictEqual(node);
-	expect(customTable.buckets[customTable.getBitwiseDistance(node)].at(-1)).toStrictEqual(node);
-});
-
-it("does not send node to tail of bucket on peek", () => {
-	const customTable = new KademliaTable(Buffer.from("00000000", "hex"), TEST_TABLE_CONFIGURATION);
-
-	const node = Buffer.from(`ffffffff`, "hex");
+	const node = new Uint8Array(8).fill(0xff);
 
 	customTable.add(node);
 
 	for (let i = 0; i < 10; i++) {
-		customTable.add(Buffer.from(`fffffff${i.toString(10)}`, "hex"));
+		const nodeI = new Uint8Array(8).fill(0xff);
+
+		node.set([i], 7);
+
+		customTable.add(nodeI);
 	}
 
-	const result = customTable.peekById(node);
+	customTable.markSuccess(node);
 
-	expect(result).toStrictEqual(node);
-	expect(customTable.buckets[customTable.getBitwiseDistance(node)].at(0)).toStrictEqual(node);
+	const getNode = customTable.buckets[customTable.getDistance(node)]?.items.at(-1)?.node;
+
+	expect(compare(getNode!, node)).toBe(0);
 });

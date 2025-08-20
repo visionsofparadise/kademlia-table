@@ -1,6 +1,6 @@
 # kademlia-table
 
-XOR distance based routing table used for P2P networks such as a Kademlia DHT.
+XOR distance based routing table used for P2P networks, based on the [Kademlia DHT paper](https://pdos.csail.mit.edu/~petar/papers/maymounkov-kademlia-lncs.pdf).
 
 ```
 npm install kademlia-table
@@ -9,8 +9,8 @@ npm install kademlia-table
 An extendable implementation of Kademlia and K-Buckets closely following details set out in the [Kademlia DHT paper](https://pdos.csail.mit.edu/~petar/papers/maymounkov-kademlia-lncs.pdf).
 
 - Nodes are indexed into buckets base on XOR bitwise distance from the table id.
-- Retrieved nodes are marked as seen and moved to the tail of the bucket.
-- A compare function decides which nodes to keep when adding to full buckets.
+- LRU order and removal are handled internally and managed externally through the use of 'markSuccess' and 'markError' on UDP successes and errors.
+- This implementation does not implement the binary tree structure set out in the additions to the paper, instead opting for a flat bucket structure.
 
 ## Usage
 
@@ -26,16 +26,23 @@ interface Node {
 const table = new KademliaTable<Node>(id(), { getNode: (node) => node.id });
 
 // Add a node to the routing table
+// If the bucket is full, node is added to a replacement cache. 
+// When nodes are removed they are replaced by nodes in the replacement cache
 table.add({ id: id() });
 
-// Get the 20 nodes "closest" to a passed in id and marks them as seen.
+// Get the 20 nodes "closest" to a passed in id.
 const closest = table.listClosestToId(id(), 20);
 
-// Gets the node by id and marks it as seen.
-const node1 = table.getById(id())
+// Gets the node by id.
+const node1 = table.get(id())
 
-// Gets the node without marking as seen.
-const node2 = table.peekById(id())
+// Resets a nodes error counter and places the node at the end of the LRU list.
+table.markSuccess(id())
+
+// Increments a nodes error counter
+// If a nodes error counter exceeds the tables errorLimit, it is removed and replaced by a replacement cache node.
+// If the replacement cache is empty then the node is not removed. This prevents buckets emptying when there is local network disruption.
+table.markError(id())
 
 for (const node of table) {
 	// nodes can be iterated, sorted closest to furthest.
@@ -53,7 +60,7 @@ Create a new routing table.
 ```js
 {
 	bucketSize?: number;
-	compare?: (nodeA: Node, nodeB: Node) => number; // Compare for nodes being added to full buckets
+	errorLimit?: number;
 	getId: (node: Node) => Uint8Array; // Gets id from node
 }
 ```
@@ -61,73 +68,66 @@ Create a new routing table.
 #### `bool = table.add(node)`
 
 Insert a new node. When inserting a node the XOR distance between the node and 
-the table id is calculated and used to figure which bucket this node should be 
+the table id is calculated and used to figure out which bucket this node should be 
 inserted into.
 
-If the bucket is full, the compare function is used to determine whether to add
-and select which node to remove.
+If the bucket is full, the node is added to a replacement cache. If the replacement
+cache is full the node is not added.
 
-Returns `true` if the node is newly added.
-Returns `false` if the bucket is full or already exists.
-
-#### `bool = table.has(id)`
-
-Returns `true` if a node exists for the passed in `id` and `false` otherwise.
-
-#### `node = table.get(d)`
-
-Returns a node from the d distance bucket and marks it as seen.
-
-#### `node = table.getById(id)`
-
-Returns a node with the given id and marks it as seen.
-
-#### `node = table.peek(d)`
-
-Returns a node from the d distance bucket.
-
-#### `node = table.peekById(id)`
-
-Returns a node with the given id.
-
-#### `i = table.getBucketIndex(id)`
-
-Returns an id's corresponding bucket index.
-
-#### `nodes = table.listClosestToId(id, [maxNodes])`
-
-Returns an array of the closest (in XOR distance) nodes to the passed in id,
-and marks them as seen.
-
-This method is normally used in a routing context, i.e. figuring out which nodes
-in a DHT should store a value based on its id.
-
-#### `true = table.update(node)`
-
-Updates the given node in the table.
-
-#### `true = table.remove(id)`
-
-Remove a node using its id.
-
-Returns `true` if the node is removed.
-Returns `false` if the node does not exist.
-
-#### `true = table.clear()`
-
-Removes all nodes from the table.
+Returns `true` if the node is added to the bucket.
 
 #### `table.buckets`
 
 A fixed size array of all buckets in the table.
 
-#### `number = getBitDistance(idA, idB)`
+#### `true = table.clear()`
 
-Gets the XOR distance between two id buffers.
+Removes all nodes from the table.
 
-#### `1 | -1 | 0 = compareBitDistance(idA, idB) = createCompareBitDistance(id)`
+#### `node = table.get(id)`
 
-Creates a function for sorting ids based on distance from a target id going from closest to furthest
+Returns a node with the given id.
+
+#### `i = table.getDistance(id)`
+
+Returns an id's XOR distance, used for indexing nodes in buckets.
+
+#### `bool = table.has(id)`
+
+Returns `true` if a node exists for the passed in `id` and `false` otherwise.
+
+#### `nodes = table.listClosestToId(id, [maxNodes])`
+
+Returns an array of the closest (in XOR distance) nodes to the passed in id.
+
+This method is normally used in a routing context, i.e. figuring out which nodes
+in a DHT should store a value based on its id.
+
+#### `bool = table.markError(id)`
+
+Increments a nodes error counter.
+
+If a nodes error counter exceeds the tables errorLimit, 
+it is removed and replaced by a replacement cache node.
+
+If the replacement cache is empty then the node is not removed. 
+This prevents buckets emptying when there is local network disruption.
+
+#### `bool = table.markSuccess(id)`
+
+Resets a nodes error counter and places the node at the end of the LRU list.
+
+#### `true = table.remove(id, d, force?)`
+
+Remove a node using its id. If there are no replacements in the replacement cache then the node is not removed.
+
+Returns `true` if the node is removed.
+
+#### `true = table.update(node)`
+
+Updates the given node in the table.
+
+
 
 ## License
 

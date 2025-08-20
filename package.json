@@ -1,7 +1,7 @@
 {
   "name": "kademlia-table",
-  "version": "2.0.11",
-  "description": "XOR based routing table used for P2P networks such as a Kademlia DHT.",
+  "version": "3.0.0",
+  "description": "XOR distance based routing table used for P2P networks, based on the Kademlia DHT paper",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
@@ -43,7 +43,12 @@
     "xor",
     "routing",
     "distributed",
-    "systems"
+    "systems",
+    "LRU",
+    "UDP",
+    "node",
+    "bucket",
+    "dht"
   ],
   "repository": {
     "type": "git",
