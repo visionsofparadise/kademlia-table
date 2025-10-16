@@ -28,27 +28,31 @@ export class KademliaTable<T> {
 	constructor(public readonly id: Uint8Array, options: KademliaTable.Options<T>) {
 		this.bucketSize = options.bucketSize || 20;
 		this.buckets = new Array(id.length * 8 + 1).fill(undefined).map(() => ({ items: [], replacementItems: [] }));
-		this.errorLimit = options.errorLimit || 5;
+		this.errorLimit = options.errorLimit || 3;
 		this.getId = options.getId;
 	}
 
-	get length() {
+	get length(): number {
 		return this.buckets.reduce((sum, bucket) => sum + bucket.items.length, 0);
 	}
 
 	*[Symbol.iterator](): IterableIterator<T> {
-		for (const bucket of this.buckets) for (const item of bucket.items) yield item.node;
+		for (const bucket of this.buckets) {
+			// Yield most recently seen nodes first within each bucket
+			for (let i = bucket.items.length - 1; i >= 0; i--) {
+				yield bucket.items[i].node;
+			}
+		}
 	}
 
 	add(node: T, d: number = this.getDistance(this.getId(node))): boolean {
+		if (d === 0) return false;
+
 		const bucket = this.getBucket(d);
 
-		if (
-			!bucket ||
-			bucket.items.find((item) => compare(this.getId(item.node), this.getId(node)) === 0) ||
-			bucket.replacementItems.find((item) => compare(this.getId(item.node), this.getId(node)) === 0)
-		)
-			return false;
+		const nodeId = this.getId(node);
+
+		if (!bucket || bucket.items.find((item) => compare(this.getId(item.node), nodeId) === 0) || bucket.replacementItems.find((item) => compare(this.getId(item.node), nodeId) === 0)) return false;
 
 		if (bucket.items.length >= this.bucketSize) {
 			if (bucket.replacementItems.length >= this.bucketSize) return false;
@@ -58,7 +62,7 @@ export class KademliaTable<T> {
 				errorCount: 0,
 			});
 
-			return false;
+			return true;
 		}
 
 		bucket.items.push({
@@ -69,12 +73,12 @@ export class KademliaTable<T> {
 		return true;
 	}
 
-	clear() {
+	clear(): void {
 		for (let i = 0; i < this.buckets.length; i++) this.buckets[i] = { items: [], replacementItems: [] };
 	}
 
 	*iterateClosestToId(id: Uint8Array): IterableIterator<T> {
-		return this.iterateNodes(id);
+		yield* this.iterateNodes(id);
 	}
 
 	listClosestToId(id: Uint8Array, limit: number = this.buckets.length * this.bucketSize): Array<T> {
@@ -94,22 +98,31 @@ export class KademliaTable<T> {
 	}
 
 	protected *iterateNodes(id: Uint8Array, d: number = this.getDistance(id)): IterableIterator<T> {
-		const bucketLimit = Math.max(d, this.buckets.length - 1 - d);
+		yield* this.yieldBucketNodes(d);
 
-		let depth = 0;
-		let offset = (depth % 2 === 0 ? 1 : -1) * Math.ceil(depth / 2);
+		const maxDistance = Math.max(d, this.buckets.length - 1 - d);
 
-		while (Math.abs(offset) <= bucketLimit) {
-			const i = d + offset;
-
-			if (0 <= i && i < this.buckets.length) {
-				const bucket = this.getBucket(i);
-
-				if (bucket) for (const item of bucket.items) yield item.node;
+		for (let distance = 1; distance <= maxDistance; distance++) {
+			const leftBucket = d - distance;
+			if (leftBucket >= 0) {
+				yield* this.yieldBucketNodes(leftBucket);
 			}
 
-			depth++;
-			offset = (depth % 2 === 0 ? 1 : -1) * Math.ceil(depth / 2);
+			const rightBucket = d + distance;
+			if (rightBucket < this.buckets.length) {
+				yield* this.yieldBucketNodes(rightBucket);
+			}
+		}
+	}
+
+	private *yieldBucketNodes(bucketIndex: number): IterableIterator<T> {
+		const bucket = this.getBucket(bucketIndex);
+		if (bucket) {
+			// Iterate in reverse to yield most recently seen nodes first (tail to head)
+			// Tail = most live, head = least live
+			for (let i = bucket.items.length - 1; i >= 0; i--) {
+				yield bucket.items[i].node;
+			}
 		}
 	}
 
@@ -140,18 +153,13 @@ export class KademliaTable<T> {
 
 		if (index === -1) return false;
 
-		const items = bucket.items.splice(index, 1);
+		const [item] = bucket.items.splice(index, 1);
 
-		bucket.items.push(
-			...items.map((item) => ({
-				...item,
-				errorCount: item.errorCount + 1,
-			}))
-		);
+		item.errorCount++;
 
-		for (const item of items) {
-			if (item.errorCount + 1 < this.errorLimit) continue;
+		bucket.items.push(item);
 
+		if (item.errorCount >= this.errorLimit) {
 			this.remove(this.getId(item.node));
 		}
 
@@ -167,14 +175,11 @@ export class KademliaTable<T> {
 
 		if (index === -1) return false;
 
-		const items = bucket.items.splice(index, 1);
+		const [item] = bucket.items.splice(index, 1);
 
-		bucket.items.push(
-			...items.map((item) => ({
-				...item,
-				errorCount: 0,
-			}))
-		);
+		item.errorCount = 0;
+
+		bucket.items.push(item);
 
 		return true;
 	}
@@ -184,21 +189,18 @@ export class KademliaTable<T> {
 
 		if (!bucket) return false;
 
-		const index = bucket.items.findIndex((item) => compare(this.getId(item.node), this.getId(node)) === 0);
+		const nodeId = this.getId(node);
+
+		const index = bucket.items.findIndex((item) => compare(this.getId(item.node), nodeId) === 0);
 
 		if (index === -1) {
-			const replacementIndex = bucket.replacementItems.findIndex((item) => compare(this.getId(item.node), this.getId(node)) === 0);
+			const replacementIndex = bucket.replacementItems.findIndex((item) => compare(this.getId(item.node), nodeId) === 0);
 
 			if (replacementIndex === -1) return false;
 
-			const replacementItem = bucket.replacementItems[index];
+			bucket.replacementItems[replacementIndex].node = node;
 
-			bucket.replacementItems[index] = {
-				node,
-				errorCount: replacementItem.errorCount,
-			};
-
-			return false;
+			return true;
 		}
 
 		const item = bucket.items[index];
@@ -225,7 +227,7 @@ export class KademliaTable<T> {
 
 			bucket.replacementItems.splice(replacementIndex, 1);
 
-			return false;
+			return true;
 		}
 
 		if (bucket.replacementItems.length || force) {
@@ -233,7 +235,7 @@ export class KademliaTable<T> {
 
 			const replacementItem = bucket.replacementItems.shift();
 
-			if (replacementItem) bucket.items.unshift(replacementItem);
+			if (replacementItem) bucket.items.push(replacementItem);
 		}
 
 		return true;

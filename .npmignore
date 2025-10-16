@@ -2,3 +2,5 @@ node_modules
 src
 .github
 .vscode
+.claude
+CLAUDE.md
